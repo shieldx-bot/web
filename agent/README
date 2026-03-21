@@ -21,8 +21,11 @@ sudo kubectl port-forward pod/myapp-7876455b56-scshr 3000:3000 -n backend
 Chay toan bo manifest:
 
 ```bash
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
 kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/
 ```
+
+Luu y: IOChaos da duoc cau hinh inject tren `/mnt/chaos`, khong inject vao root filesystem `/`.
 
 Xem trang thai:
 

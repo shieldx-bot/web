@@ -51,7 +51,7 @@ sudo k3s kubectl port-forward pod/my-grafana-786d99cb8d-d4lh6 3000:3000 -n monit
 Gan nhan node de dồn tai chaos:
 
 ```bash
-kubectl label node <k3s-node-1> chaos-target=true
+kubectl label node worker-1 chaos-target=true
 kubectl label node <k3s-node-2> chaos-target=true
 ```
 
@@ -63,12 +63,25 @@ Va (neu can) dependency service co label:
 
 - `role=dependency`
 
+Quan trong voi `IOChaos`:
+
+- Khong inject vao `volumePath: /` (root filesystem).
+- Pod target can co volume mount rieng tai `/mnt/chaos`.
+- Da co file mau: `LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml`.
+
+Tao target nhanh (khuyen nghi):
+
+```bash
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
+kubectl get pods -n backend -l chaos-target=true
+```
+
 ## 5) Chay chaos plan 24h
 
 Apply toan bo manifest:
 
 ```bash
-kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/
+kubectl apply -f  ./chaos-mesh-manifests/
 ```
 
 Kiem tra trang thai chaos object:
@@ -105,13 +118,13 @@ Script se:
 Lenh chay mau 24h:
 
 ```bash
-python LAB_CENTER/agent/main.py \
+python  main.py \
   --prom-url http://localhost:9090 \
-  --start 2026-03-20T00:00:00 \
-  --end 2026-03-21T00:00:00 \
+  --start 2026-03-21T11:00:00 \
+  --end 2026-03-22T11:00:00 \
   --step 30s \
-  --rules LAB_CENTER/agent/chaos-labeling-rules.yaml \
-  --output LAB_CENTER/agent/chaos_labeled_30s.csv
+  --rules  chaos-labeling-rules.yaml \
+  --output chaos_labeled_30s.csv
 ```
 
 ## 8) Dinh dang output CSV
@@ -165,3 +178,15 @@ pip install requests pyyaml pandas
 - Kiem tra label `chaos-target=true`
 - Kiem tra namespace selector trong manifest
 - Kiem tra `role=dependency` doi voi test partition
+
+5. Loi `toda ... path is the root` khi chay IOChaos
+- Nguyen nhan: IOChaos dang inject vao root path (`/`).
+- Cach xu ly:
+
+```bash
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/10-disk-iochaos.yaml
+kubectl describe iochaos disk-latency-read-write -n backend
+```
+
+- Trang thai mong doi: `Selected=True`, `AllInjected=True`.

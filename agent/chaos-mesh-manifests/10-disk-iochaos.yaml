@@ -11,8 +11,8 @@ spec:
       - backend
     labelSelectors:
       chaos-target: "true"
-  volumePath: /
-  path: "/*"
+  volumePath: /mnt/chaos
+  path: "/mnt/chaos/*"
   delay: "80ms"
   percent: 100
   methods:
@@ -34,8 +34,8 @@ spec:
       - backend
     labelSelectors:
       chaos-target: "true"
-  volumePath: /
-  path: "/*"
+  volumePath: /mnt/chaos
+  path: "/mnt/chaos/*"
   errno: 5
   percent: 100
   methods:
@@ -56,8 +56,8 @@ spec:
       - backend
     labelSelectors:
       chaos-target: "true"
-  volumePath: /
-  path: "/*"
+  volumePath: /mnt/chaos
+  path: "/mnt/chaos/*"
   errno: 28
   percent: 100
   methods:
