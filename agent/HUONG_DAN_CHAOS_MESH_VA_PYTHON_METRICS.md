@@ -1,192 +1,142 @@
-# Huong Dan Chay Chaos Mesh Va Python Metrics
+# Huong Dan Su Dung Chaos Mesh Va Python Metrics
 
-Tai lieu nay huong dan end-to-end:
+Tai lieu nay la ban huong dan da duoc toi uu theo ket qua test local.
+Muc tieu:
 
-1. Chuan bi cluster k3s + Chaos Mesh + monitoring
-2. Chay ke hoach chaos 24h
-3. Thu metric tu Prometheus moi 30s
-4. Gan nhan label theo bo rule
-5. Xuat dataset CSV
+1. Chay chaos an toan, khong bi xung dot network tc/ipset.
+2. Thu metric Prometheus moi 30s.
+3. Gan nhan theo rule va xuat CSV.
 
 ## 1) Dieu kien tien quyet
 
-- Da co cluster `k3s`.
-- Da cai `Chaos Mesh` (namespace `chaos-mesh`).
-- Da co stack monitoring (Prometheus + Grafana) trong namespace `monitoring`.
-- Co quyen `kubectl` vao cluster.
-- Python environment san sang trong workspace.
+- Da co Kubernetes cluster va `kubectl` truy cap duoc.
+- Da cai Chaos Mesh (`chaos-mesh` namespace).
+- Da co monitoring (`monitoring` namespace), co Prometheus.
+- Trong namespace `backend` co pod target label `chaos-target=true`.
 
 Kiem tra nhanh:
 
 ```bash
-kubectl get ns
+kubectl get ns | grep -E "chaos-mesh|monitoring|backend" || true
 kubectl get pods -n chaos-mesh
 kubectl get pods -n monitoring
 ```
 
-## 2) Cac file su dung
+## 2) Nguyen tac chay quan trong
 
-- Ke hoach 24h: `LAB_CENTER/agent/chaos-mesh-24h-plan.md`
-- Manifest chaos: `LAB_CENTER/agent/chaos-mesh-manifests/`
-- Dieu khoan label: `LAB_CENTER/agent/chaos-labeling-terms.md`
-- Rule label YAML: `LAB_CENTER/agent/chaos-labeling-rules.yaml`
-- Script Python metric + label: `LAB_CENTER/agent/main.py`
+- Khong `apply` tat ca file network chaos cung luc neu ban test immediate mode.
+- Khong chay immediate network (`20-network-chaos.yaml`) dong thoi voi schedule network (`30-schedules-24h.yaml`).
+- IOChaos chi inject vao `/mnt/chaos`, khong inject vao root `/`.
 
-## 3) Mo dashboard quan sat
+## 3) Khoi tao backend + target pod
 
 ```bash
-kubectl port-forward svc/my-grafana 3000:80 -n monitoring
-kubectl port-forward svc/chaos-dashboard 2333:30329 -n chaos-mesh
-```
+kubectl get ns backend >/dev/null 2>&1 || kubectl create ns backend
+kubectl label ns backend chaos-injection=enabled --overwrite
 
-Neu dung pod port-forward:
-
-```bash
-sudo k3s kubectl port-forward pod/chaos-dashboard-6b9c9c6ff7-95d57 8080:2333 -n chaos-mesh --address 0.0.0.0
-sudo k3s kubectl port-forward pod/my-grafana-786d99cb8d-d4lh6 3000:3000 -n monitoring --address 0.0.0.0
-```
-
-## 4) Gan target vao node/pod can inject
-
-Gan nhan node de dồn tai chaos:
-
-```bash
-kubectl label node worker-1 chaos-target=true
-kubectl label node <k3s-node-2> chaos-target=true
-```
-
-Dam bao workload trong `backend` co label:
-
-- `chaos-target=true`
-
-Va (neu can) dependency service co label:
-
-- `role=dependency`
-
-Quan trong voi `IOChaos`:
-
-- Khong inject vao `volumePath: /` (root filesystem).
-- Pod target can co volume mount rieng tai `/mnt/chaos`.
-- Da co file mau: `LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml`.
-
-Tao target nhanh (khuyen nghi):
-
-```bash
-kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
+kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/00-common-labels.yaml
+kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
+kubectl rollout status deploy/chaos-target-nginx -n backend --timeout=120s
 kubectl get pods -n backend -l chaos-target=true
 ```
 
-## 5) Chay chaos plan 24h
+## 4) Chay 24h schedule mode (khuyen nghi)
 
-Apply toan bo manifest:
-
-```bash
-kubectl apply -f  ./chaos-mesh-manifests/
-```
-
-Kiem tra trang thai chaos object:
+Day la mode on dinh nhat de thu du lieu dai han:
 
 ```bash
-kubectl get iochaos,networkchaos,dnschaos,stresschaos,schedules -n backend
-kubectl describe schedule chaos-24h-network-delay -n backend
+kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/30-schedules-24h.yaml
+kubectl get schedules -n backend
+kubectl get iochaos,networkchaos,dnschaos,stresschaos -n backend
 ```
 
-## 6) Chuan bi Python environment
+## 5) Chay immediate mode de test nhanh
 
-Kich hoat env:
+### 5.1 Disk test
 
 ```bash
-source env/bin/activate
+kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/10-disk-iochaos.yaml
+kubectl describe iochaos disk-latency-read-write -n backend | egrep "Type:|Status:|Failed|Applied"
 ```
 
-Cai package can thiet:
+Ky vong: `Selected=True`, `AllInjected=True`, khong co `path is the root`.
+
+### 5.2 Network test (serial)
+
+Khuyen nghi dung script serial:
 
 ```bash
-pip install requests pyyaml pandas
+chmod +x /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/22-network-chaos-serial.sh
+/home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/22-network-chaos-serial.sh
 ```
+
+Script nay chay tung fault mot, tranh xung dot netem tree.
+
+## 6) Xu ly loi thuong gap
+
+### 6.1 `unable to set tcs` hoac `unable to flush ip sets`
+
+Nguyen nhan pho bien: network faults chong len nhau hoac resource bi ket finalizer.
+
+Xu ly nhanh:
+
+```bash
+kubectl delete networkchaos --all -n backend --ignore-not-found
+for r in $(kubectl get networkchaos -n backend -o name); do
+  kubectl patch -n backend "$r" --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' || true
+done
+kubectl rollout restart ds/chaos-daemon -n chaos-mesh
+kubectl rollout status ds/chaos-daemon -n chaos-mesh --timeout=120s
+```
+
+### 6.2 `path is the root`
+
+Nguyen nhan: IOChaos inject vao root filesystem.
+
+File hien tai da dung path an toan:
+- `volumePath: /mnt/chaos`
+- `path: /mnt/chaos/*`
+
+### 6.3 `no pod is selected`
+
+Kiem tra target:
+
+```bash
+kubectl get pods -n backend -l chaos-target=true
+```
+
+Neu khong co pod nao, apply lai `01-chaos-target-nginx.yaml`.
 
 ## 7) Thu metric va gan nhan moi 30s
 
-Script se:
-
-- Goi Prometheus `/api/v1/query_range` theo `--step 30s`
-- Tao 1 dong moi `timestamp + instance`
-- Moi cot la metric (va feature rolling)
-- Gan nhan theo `chaos-labeling-rules.yaml`
-- Xuat CSV label
-
-Lenh chay mau 24h:
-
 ```bash
-python  main.py \
+source /home/shieldx/Documents/Github/lab-mechine-learning/env/bin/activate
+pip install requests pyyaml pandas
+
+python /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/main.py \
   --prom-url http://localhost:9090 \
   --start 2026-03-21T11:00:00 \
   --end 2026-03-22T11:00:00 \
   --step 30s \
-  --rules  chaos-labeling-rules.yaml \
-  --output chaos_labeled_30s.csv
+  --rules /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-labeling-rules.yaml \
+  --output /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos_labeled_30s.csv
 ```
 
-## 8) Dinh dang output CSV
-
-Cac cot label chinh:
-
-- `timestamp`
-- `instance`
-- `window_size` (co dinh `30s`)
+Output se gom cot metric + cot label:
 - `label_root_cause`
 - `label_severity`
 - `label_confidence`
 - `matched_rules`
 - `is_mixed`
 
-Cac cot con lai:
-
-- Toan bo metric
-- Feature rolling cho `w30/w60/w300`: `mu`, `z`, `delta`, `slope`
-
-## 9) Dung va cleanup sau khi thu du lieu
+## 8) Cleanup an toan
 
 ```bash
-kubectl delete -f LAB_CENTER/agent/chaos-mesh-manifests/
+kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/30-schedules-24h.yaml --ignore-not-found
+kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/21-dns-chaos.yaml --ignore-not-found
+kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/20-network-chaos.yaml --ignore-not-found
+kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/11-disk-stress-and-fill.yaml --ignore-not-found
+kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/10-disk-iochaos.yaml --ignore-not-found
 ```
 
-## 10) Loi thuong gap
-
-1. Khong lay duoc metric tu Prometheus
-- Kiem tra URL `--prom-url`
-- Kiem tra Prometheus co metric hay khong
-- Thu test API:
-
-```bash
-curl "http://localhost:9090/api/v1/query?query=up"
-```
-
-2. Loi Python import `requests` hoac `yaml`
-- Cai lai package:
-
-```bash
-pip install requests pyyaml pandas
-```
-
-3. File CSV trong
-- Kiem tra thoi gian `--start --end`
-- Kiem tra metric ton tai trong cluster hien tai
-- Kiem tra namespace monitoring exporters da chay
-
-4. Chaos khong inject vao pod mong muon
-- Kiem tra label `chaos-target=true`
-- Kiem tra namespace selector trong manifest
-- Kiem tra `role=dependency` doi voi test partition
-
-5. Loi `toda ... path is the root` khi chay IOChaos
-- Nguyen nhan: IOChaos dang inject vao root path (`/`).
-- Cach xu ly:
-
-```bash
-kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
-kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/10-disk-iochaos.yaml
-kubectl describe iochaos disk-latency-read-write -n backend
-```
-
-- Trang thai mong doi: `Selected=True`, `AllInjected=True`.
+Neu can xoa manh network chaos dang ket finalizer, dung them block o muc `6.1`.

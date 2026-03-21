@@ -29,7 +29,7 @@ metadata:
   name: chaos-24h-network-delay
   namespace: backend
 spec:
-  schedule: "20 */4 * * *"
+  schedule: "0 */6 * * *"
   type: NetworkChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -45,7 +45,7 @@ spec:
       latency: "150ms"
       correlation: "35"
       jitter: "50ms"
-    duration: "35m"
+    duration: "20m"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
@@ -53,7 +53,7 @@ metadata:
   name: chaos-24h-network-loss
   namespace: backend
 spec:
-  schedule: "10 */4 * * *"
+  schedule: "30 */6 * * *"
   type: NetworkChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -69,7 +69,7 @@ spec:
     loss:
       loss: "10"
       correlation: "25"
-    duration: "30m"
+    duration: "20m"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
@@ -77,7 +77,7 @@ metadata:
   name: chaos-24h-network-duplicate
   namespace: backend
 spec:
-  schedule: "40 */6 * * *"
+  schedule: "0 1-23/6 * * *"
   type: NetworkChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -93,7 +93,7 @@ spec:
     duplicate:
       duplicate: "6"
       correlation: "20"
-    duration: "25m"
+    duration: "20m"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
@@ -101,7 +101,7 @@ metadata:
   name: chaos-24h-network-corrupt
   namespace: backend
 spec:
-  schedule: "50 */6 * * *"
+  schedule: "30 1-23/6 * * *"
   type: NetworkChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -125,7 +125,7 @@ metadata:
   name: chaos-24h-bandwidth-limit
   namespace: backend
 spec:
-  schedule: "30 */8 * * *"
+  schedule: "0 2-23/6 * * *"
   type: NetworkChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -141,7 +141,7 @@ spec:
       rate: "3mbps"
       limit: 20971520
       buffer: 10000
-    duration: "40m"
+    duration: "20m"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
@@ -149,7 +149,7 @@ metadata:
   name: chaos-24h-partition
   namespace: backend
 spec:
-  schedule: "0 */12 * * *"
+  schedule: "30 2-23/6 * * *"
   type: NetworkChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -169,7 +169,7 @@ spec:
           - backend
         labelSelectors:
           role: dependency
-    duration: "20m"
+    duration: "15m"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
@@ -177,7 +177,7 @@ metadata:
   name: chaos-24h-dns-fault
   namespace: backend
 spec:
-  schedule: "15 */6 * * *"
+  schedule: "0 3-23/6 * * *"
   type: DNSChaos
   concurrencyPolicy: Forbid
   historyLimit: 3
@@ -191,4 +191,4 @@ spec:
         chaos-target: "true"
     patterns:
       - "*.svc.cluster.local"
-    duration: "20m"
+    duration: "15m"

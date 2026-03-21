@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-corrupt
+  namespace: backend
+spec:
+  action: corrupt
+  mode: fixed-percent
+  value: "60"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  corrupt:
+    corrupt: "3"
+    correlation: "25"
+  duration: "20m"

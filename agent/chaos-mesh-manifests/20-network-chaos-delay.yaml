@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-delay-p95
+  namespace: backend
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  delay:
+    latency: "180ms"
+    correlation: "35"
+    jitter: "60ms"
+  duration: "30m"

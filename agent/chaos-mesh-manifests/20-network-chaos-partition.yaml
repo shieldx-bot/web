@@ -1,0 +1,22 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-partition-hard
+  namespace: backend
+spec:
+  action: partition
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  direction: both
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        role: dependency
+  duration: "25m"

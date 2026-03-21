@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-loss-burst
+  namespace: backend
+spec:
+  action: loss
+  mode: fixed-percent
+  value: "70"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  loss:
+    loss: "12"
+    correlation: "30"
+  duration: "25m"

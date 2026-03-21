@@ -18,14 +18,17 @@ sudo kubectl port-forward pod/myapp-7876455b56-scshr 3000:3000 -n backend
 - Label terms: `LAB_CENTER/agent/chaos-labeling-terms.md`
 - Label rules YAML: `LAB_CENTER/agent/chaos-labeling-rules.yaml`
 
-Chay toan bo manifest:
+Chay 24h schedule mode (khong chay chung voi immediate mode):
 
 ```bash
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/00-common-labels.yaml
 kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
-kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/
+kubectl rollout status deploy/chaos-target-nginx -n backend --timeout=120s
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/30-schedules-24h.yaml
 ```
 
 Luu y: IOChaos da duoc cau hinh inject tren `/mnt/chaos`, khong inject vao root filesystem `/`.
+Khong `kubectl apply -f` ca thu muc vi se tao ca immediate chaos (`10/11/20/21`) va schedule cung luc, de xay ra xung dot tc/ipset.
 
 Xem trang thai:
 
