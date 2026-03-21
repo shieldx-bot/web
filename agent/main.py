@@ -56,7 +56,7 @@ DEFAULT_METRIC_QUERIES: Dict[str, str] = {
 	"request_count": "sum by (instance) (rate(node_netstat_Tcp_InSegs[5m]) + rate(node_netstat_Tcp_OutSegs[5m]))",
 	"checksum_error_rate": "sum by (instance) (rate(node_network_receive_crc_errors_total[5m]) + rate(node_network_receive_frame_errors_total[5m]) + rate(node_netstat_Tcp_InCsumErrors[5m]) + rate(node_netstat_Udp_InCsumErrors[5m]))",
 	"bandwidth_util_percent": "100 * sum by (instance) (rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m])) / 125000000",
-	"throughput_plateau": "abs(deriv(sum by (instance) (rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m]))[5m]))",
+	"throughput_plateau": "abs(deriv((sum by (instance) (rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m])))[5m:30s]))",
 	"net_queue_length": "avg by (instance) (node_network_transmit_queue_length + node_network_receive_queue_length)",
 	"tcp_send_queue": "avg by (instance) (node_netstat_Tcp_SendQueueSize)",
 	"net_rtt_ms": "avg by (instance) (1000 * node_tcp_rtt_seconds)",
@@ -164,8 +164,23 @@ def fetch_all_metrics(
 	timeout: int,
 ) -> pd.DataFrame:
 	rows: List[Dict[str, Any]] = []
+	failed_metrics: List[str] = []
 	for alias, promql in alias_to_query.items():
-		result = prometheus_query_range(prom_url, promql, start, end, step, timeout)
+		try:
+			result = prometheus_query_range(prom_url, promql, start, end, step, timeout)
+		except requests.HTTPError as exc:
+			failed_metrics.append(alias)
+			resp_text = ""
+			if exc.response is not None:
+				resp_text = exc.response.text.strip()
+			print(f"[WARN] Skip metric '{alias}' due to HTTP error: {exc}")
+			if resp_text:
+				print(f"[WARN] Prometheus response: {resp_text}")
+			continue
+		except requests.RequestException as exc:
+			failed_metrics.append(alias)
+			print(f"[WARN] Skip metric '{alias}' due to request error: {exc}")
+			continue
 		for series in result:
 			metric_labels = series.get("metric", {})
 			instance = metric_labels.get("instance") or metric_labels.get("pod") or "cluster"
@@ -182,6 +197,9 @@ def fetch_all_metrics(
 						"value": val,
 					}
 				)
+
+	if failed_metrics:
+		print(f"[WARN] Failed metrics count: {len(failed_metrics)} | {', '.join(sorted(failed_metrics))}")
 
 	if not rows:
 		raise RuntimeError("No metric data returned from Prometheus")
