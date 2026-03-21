@@ -1,0 +1,293 @@
+version: 1
+profile: chaos-24h-k3s
+
+windows:
+  - name: w30
+    seconds: 30
+    threshold_multiplier: 1.3
+  - name: w60
+    seconds: 60
+    threshold_multiplier: 1.0
+  - name: w300
+    seconds: 300
+    threshold_multiplier: 0.8
+
+baseline:
+  bootstrap_range: "00:00-02:00"
+  update_mode: hourly_excluding_injection
+  by_dimension:
+    - instance
+
+global:
+  eps: 1.0e-9
+  consensus:
+    min_windows_agree: 2
+    total_windows: 3
+  hard_fault_min_consecutive_samples: 2
+
+labels:
+  root_cause:
+    - normal
+    - disk_latency
+    - disk_saturation
+    - disk_error
+    - disk_capacity
+    - net_delay
+    - net_loss
+    - net_duplicate
+    - net_corrupt
+    - net_bandwidth_limit
+    - net_partition
+    - dns_fault
+    - mixed_fault
+    - unknown_anomaly
+  severity:
+    - low
+    - medium
+    - high
+    - critical
+
+rules:
+  - id: R_PARTITION_HARD
+    label: net_partition
+    hard_fault: true
+    all_of:
+      - metric: zero_traffic
+        op: eq
+        value: 1
+      - metric: request_fault
+        op: z_gt
+        value: 3
+        window: w60
+      - metric: timeout_total
+        op: z_gt
+        value: 3
+        window: w60
+
+  - id: R_DNS_HARD
+    label: dns_fault
+    hard_fault: true
+    any_of:
+      - metric: dns_probe_success
+        op: eq
+        value: 0
+      - all_of:
+          - metric: dns_failure_rate
+            op: z_gt
+            value: 3
+            window: w60
+          - metric: dns_lookup_time_ms
+            op: z_gt
+            value: 2
+            window: w60
+
+  - id: R_DISK_ERROR_HARD
+    label: disk_error
+    hard_fault: true
+    any_of:
+      - metric: disk_read_errors_rate
+        op: gt
+        value: 0
+      - metric: disk_write_errors_rate
+        op: gt
+        value: 0
+      - metric: container_reads_failed_rate
+        op: gt
+        value: 0
+      - metric: container_writes_failed_rate
+        op: gt
+        value: 0
+
+  - id: R_DISK_LATENCY
+    label: disk_latency
+    hard_fault: false
+    all_of:
+      - any_of:
+          - metric: disk_read_latency_ms
+            op: z_gt
+            value: 2
+            window: w60
+          - metric: disk_write_latency_ms
+            op: z_gt
+            value: 2
+            window: w60
+      - metric: disk_await_ms
+        op: z_gt
+        value: 2
+        window: w60
+      - metric: disk_svctm_ms
+        op: z_gt
+        value: 1
+        window: w300
+
+  - id: R_DISK_SATURATION
+    label: disk_saturation
+    hard_fault: false
+    all_of:
+      - any_of:
+          - metric: disk_util_percent
+            op: gt
+            value: 80
+          - metric: disk_util_percent
+            op: z_gt
+            value: 2
+            window: w300
+      - metric: io_wait_percent
+        op: z_gt
+        value: 2
+        window: w60
+      - any_of:
+          - metric: queue_length
+            op: z_gt
+            value: 2
+            window: w60
+          - metric: avg_qu_sz
+            op: z_gt
+            value: 2
+            window: w300
+
+  - id: R_DISK_CAPACITY
+    label: disk_capacity
+    hard_fault: false
+    all_of:
+      - metric: disk_usage_percent
+        op: gt
+        value: 85
+      - metric: free_space
+        op: slope_lt
+        value: 0
+        window: w300
+
+  - id: R_NET_DELAY
+    label: net_delay
+    hard_fault: false
+    all_of:
+      - metric: net_latency_p95_ms
+        op: z_gt
+        value: 2
+        window: w60
+      - metric: net_latency_p90_ms
+        op: z_gt
+        value: 2
+        window: w60
+      - metric: net_throughput
+        op: delta_gt
+        value: -0.4
+        window: w60
+
+  - id: R_NET_LOSS
+    label: net_loss
+    hard_fault: false
+    all_of:
+      - any_of:
+          - metric: packet_loss_percent
+            op: z_gt
+            value: 2
+            window: w60
+          - metric: drop_rate
+            op: z_gt
+            value: 2
+            window: w60
+      - metric: retry_rate
+        op: z_gt
+        value: 2
+        window: w60
+      - metric: net_latency_ms
+        op: z_gt
+        value: 1
+        window: w60
+
+  - id: R_NET_DUPLICATE
+    label: net_duplicate
+    hard_fault: false
+    all_of:
+      - metric: duplicate_ratio_percent
+        op: z_gt
+        value: 2
+        window: w60
+      - metric: request_count
+        op: ge
+        value: 0
+
+  - id: R_NET_CORRUPT
+    label: net_corrupt
+    hard_fault: false
+    all_of:
+      - metric: checksum_error_rate
+        op: z_gt
+        value: 2
+        window: w60
+      - any_of:
+          - metric: retry_rate
+            op: z_gt
+            value: 1
+            window: w60
+          - metric: request_fault
+            op: z_gt
+            value: 1
+            window: w60
+
+  - id: R_BANDWIDTH_LIMIT
+    label: net_bandwidth_limit
+    hard_fault: false
+    all_of:
+      - any_of:
+          - metric: bandwidth_util_percent
+            op: gt
+            value: 85
+          - metric: throughput_plateau
+            op: abs_lt
+            value: 0.02
+            window: w300
+      - any_of:
+          - metric: net_queue_length
+            op: z_gt
+            value: 2
+            window: w60
+          - metric: tcp_send_queue
+            op: z_gt
+            value: 2
+            window: w60
+      - metric: net_rtt_ms
+        op: z_gt
+        value: 1
+        window: w60
+
+post_rules:
+  - id: R_MIXED
+    when: "two_or_more_labels_in_same_5m"
+    set_label: mixed_fault
+
+  - id: R_UNKNOWN
+    when: "no_label_and_anomaly_score_ge_2.5"
+    set_label: unknown_anomaly
+
+severity:
+  impact_score:
+    components:
+      latency_timeout: 0.40
+      error_failure: 0.30
+      throughput_drop: 0.20
+      duration: 0.10
+  thresholds:
+    low: "<25"
+    medium: "25-50"
+    high: "50-75"
+    critical: ">=75"
+  overrides:
+    - when: "label=net_partition and zero_traffic_duration_s>120"
+      severity: critical
+    - when: "disk_usage_percent>=97"
+      severity: critical
+    - when: "label=disk_error and duration_s>600"
+      severity: high
+
+output_schema:
+  - timestamp
+  - instance
+  - window_size
+  - label_root_cause
+  - label_severity
+  - label_confidence
+  - matched_rules
+  - is_mixed

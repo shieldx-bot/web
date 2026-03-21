@@ -1,0 +1,255 @@
+# Nhóm 1: Giảm đột ngột (5 kịch bản)
+
+# Kịch bản 1: Giảm nhẹ - High Latency
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-throught-1
+  namespace: io-throught-1
+spec:
+  action: latency
+  mode: all
+  selector:
+    namespaces: [io-throught-1]
+    labelSelectors: {app: myapp}
+  volumePath: /app/data
+  path: "/app/data/**/*"
+  methods: [read, write]
+  delay: "50ms"              # Tăng nhẹ latency
+  percent: 20                # 20% request bị ảnh hưởng
+  duration: "5m"
+# Đặc điểm: Throughput giảm ~15-25%, ops giảm nhẹ, không có lỗi
+
+
+---
+
+
+# Kịch bản 2: Giảm trung bình - Mixed Latency + Error
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-throught-2
+  namespace: io-throught-2
+spec:
+  action: mix                # Kết hợp cả latency và fault
+  mode: all
+  selector:
+    namespaces: [io-throught-2]
+    labelSelectors: {app: myapp}
+  volumePath: /app/data
+  path: "/app/data/**/*"
+  methods: [read, write]
+  delay: "150ms"
+  errno: 5
+  percent: 40                # 40% request bị ảnh hưởng
+  duration: "7m"
+
+# Đặc điểm: Throughput giảm ~40-50%, xuất hiện lỗi I/O intermittent
+
+---
+# Kịch bản 3: Giảm nặng - High Error Rate
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-throught-3
+  namespace: io-throught-3
+spec:
+  action: fault
+  mode: all
+  selector:
+    namespaces: [io-throught-3]
+    labelSelectors: {app: myapp}
+  volumePath: /app/data
+  path: "/app/data/**/*"
+  methods: [read, write]
+  errno: 5
+  percent: 70                # 70% request bị lỗi
+  duration: "3m"
+# Đặc điểm: Throughput giảm >70%, ops gần như bằng 0, nhiều lỗi I/O
+
+
+
+---
+# Kịch bản 4: Tắc nghẽn kéo dài - High Latency + Low Percent
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-throught-4
+  namespace: io-throught-4
+spec:
+  action: latency
+  mode: all
+  selector:
+    namespaces: [io-throught-4]
+    labelSelectors: {app: myapp}
+  volumePath: /app/data
+  path: "/app/data/**/*"
+  methods: [read, write]
+  delay: "500ms"             # Rất chậm
+  percent: 10                # Nhưng chỉ 10% request
+  duration: "15m"            # Kéo dài
+# Đặc điểm: Degradation kéo dài, throughput giảm không đồng đều, pattern phức tạp
+
+---
+# Kịch bản 5: Write-only failure
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-throught-5
+  namespace: io-throught-5
+spec:
+  action: fault
+  mode: all
+  selector:
+    namespaces: [io-throught-5]
+    labelSelectors: {app: myapp}
+  volumePath: /app/data
+  path: "/app/data/**/*"
+  methods: [write]           # Chỉ tác động lên write
+  errno: 5
+  percent: 50
+  duration: "5m"
+# Đặc điểm: disk_write_ops/sec giảm mạnh, read vẫn bình thường
+
+--- 
+
+# Nhóm 2: Tăng đột ngột (5 kịch bản)
+
+
+
+# Kịch bản 6: Tăng nhẹ - CPU Stress
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: io-throught-6
+  namespace: io-throught-6
+spec:
+  mode: all
+  selector:
+    namespaces: [io-throught-6]
+    labelSelectors: {app: myapp}
+  stressors:
+    cpu:
+      workers: 1
+      load: 40               # CPU 40%
+  duration: "8m"
+# Đặc điểm: I/O tăng nhẹ ~20-30%, CPU tăng nhưng không quá tải
+
+---
+
+# Kịch bản 7: Tăng trung bình - Memory Stress
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: io-throught-7
+  namespace: io-throught-7
+spec:
+  mode: all
+  selector:
+    namespaces: [io-throught-7]
+    labelSelectors: {app: myapp}
+  stressors:
+    memory:
+      workers: 1
+      size: "100MB"          # Gần sát limit 128Mi
+  duration: "5m"
+# Đặc điểm: Memory gần limit, swap hoạt động, disk_write_bytes/sec tăng đột biến
+
+---
+
+# Kịch bản 8: Tăng nặng - CPU + Memory Combo
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: io-throught-8
+  namespace: io-throught-8
+spec:
+  mode: all
+  selector:
+    namespaces: [io-throught-8]
+    labelSelectors: {app: myapp}
+  stressors:
+    cpu:
+      workers: 2
+      load: 90               # CPU gần max
+    memory:
+      workers: 1
+      size: "110MB"          # Vượt quá limit nhẹ
+  duration: "3m"
+# Đặc điểm: Resource gần cạn, I/O tăng mạnh, có thể có OOM kill hoặc pod restart
+
+---
+
+# Kịch bản 9: Tăng theo cấp số nhân - Ramp-up
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: io-throught-9
+  namespace: io-throught-9
+spec:
+  mode: all
+  selector:
+    namespaces: [io-throught-9]
+    labelSelectors: {app: myapp}
+  stressors:
+    cpu:
+      workers: 1
+      load: 20
+  # Sử dụng schedule để tăng dần
+  schedule:
+    - duration: "2m"
+      config:
+        stressors:
+          cpu: {load: 30}
+    - duration: "2m"
+      config:
+        stressors:
+          cpu: {load: 50}
+          memory: {size: "50MB"}
+    - duration: "2m"
+      config:
+        stressors:
+          cpu: {load: 70}
+          memory: {size: "80MB"}
+    - duration: "2m"
+      config:
+        stressors:
+          cpu: {load: 90}
+          memory: {size: "100MB"}
+  duration: "8m"
+# Đặc điểm: I/O tăng dần, giúp model học pattern leo thang
+
+---
+
+
+# Kịch bản 10: I/O intensive - Disk Stress
+ 
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-throught-10
+  namespace: io-throught-10
+spec:
+  action: latency            # Không phải lỗi, mà là...
+  mode: all
+  selector:
+    namespaces: [io-throught-10]
+    labelSelectors: {app: myapp}
+  volumePath: /app/data
+  path: "/app/data/**/*"
+  methods: [read, write]
+  delay: "10ms"              # Delay nhẹ để tạo backpressure
+  percent: 100               # Tất cả request đều chậm
+  # Kết hợp với stress ở ứng dụng (cần io-generator sidecar)
+  duration: "6m"
+# Đặc điểm: Backpressure khiến hàng đợi dồn lên, ops tăng nhưng throughput giảm - pattern phức tạp
+

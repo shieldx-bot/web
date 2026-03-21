@@ -1,0 +1,65 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: disk-latency-read-write
+  namespace: backend
+spec:
+  action: latency
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  volumePath: /
+  path: "/*"
+  delay: "80ms"
+  percent: 100
+  methods:
+    - READ
+    - WRITE
+  duration: "30m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: disk-read-fault
+  namespace: backend
+spec:
+  action: fault
+  mode: fixed-percent
+  value: "50"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  volumePath: /
+  path: "/*"
+  errno: 5
+  percent: 100
+  methods:
+    - READ
+  duration: "20m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: disk-write-fault
+  namespace: backend
+spec:
+  action: fault
+  mode: fixed-percent
+  value: "50"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  volumePath: /
+  path: "/*"
+  errno: 28
+  percent: 100
+  methods:
+    - WRITE
+  duration: "20m"

@@ -1,0 +1,51 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: disk-io-saturation
+  namespace: backend
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  stressors:
+    stressngStressors: "--hdd 2 --hdd-bytes 70% --io 4 --timeout 30m"
+  duration: "30m"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: disk-fill-85-percent
+  namespace: backend
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: disk-fill
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        chaos-target: "true"
+      containers:
+        - name: fill
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              mkdir -p /data/fill
+              # Fill quickly, hold for metrics, then release to create recovery samples.
+              dd if=/dev/zero of=/data/fill/blob.bin bs=1M count=20480
+              sleep 1800
+              rm -f /data/fill/blob.bin
+              sync
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 25Gi

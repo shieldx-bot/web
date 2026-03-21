@@ -1,0 +1,49 @@
+# Agent Chaos Runbook
+
+## Port-forward nhanh
+
+```bash
+kubectl port-forward svc/my-grafana 3000:80 -n monitoring
+kubectl port-forward svc/chaos-dashboard 2333:30329 -n chaos-mesh
+sudo k3s kubectl port-forward pod/chaos-dashboard-6b9c9c6ff7-95d57 8080:2333 -n chaos-mesh --address 0.0.0.0
+sudo k3s kubectl port-forward pod/my-grafana-786d99cb8d-d4lh6 3000:3000 -n monitoring --address 0.0.0.0
+sudo kubectl port-forward pod/myapp-7876455b56-scshr 3000:3000 -n backend
+```
+
+## Ke hoach chaos 24h
+
+- Runbook chi tiet: `LAB_CENTER/agent/chaos-mesh-24h-plan.md`
+- Huong dan chay: `LAB_CENTER/agent/HUONG_DAN_CHAOS_MESH_VA_PYTHON_METRICS.md`
+- Manifest: `LAB_CENTER/agent/chaos-mesh-manifests/`
+- Label terms: `LAB_CENTER/agent/chaos-labeling-terms.md`
+- Label rules YAML: `LAB_CENTER/agent/chaos-labeling-rules.yaml`
+
+Chay toan bo manifest:
+
+```bash
+kubectl apply -f LAB_CENTER/agent/chaos-mesh-manifests/
+```
+
+Xem trang thai:
+
+```bash
+kubectl get iochaos,networkchaos,dnschaos,stresschaos,schedules -n backend
+```
+
+Cleanup:
+
+```bash
+kubectl delete -f LAB_CENTER/agent/chaos-mesh-manifests/
+```
+
+## Tao dataset metric + label (30s)
+
+```bash
+python LAB_CENTER/agent/main.py \
+	--prom-url http://localhost:9090 \
+	--start 2026-03-20T00:00:00 \
+	--end 2026-03-21T00:00:00 \
+	--step 30s \
+	--rules LAB_CENTER/agent/chaos-labeling-rules.yaml \
+	--output LAB_CENTER/agent/chaos_labeled_30s.csv
+```

@@ -1,0 +1,194 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-disk-latency
+  namespace: backend
+spec:
+  schedule: "0 */6 * * *"
+  type: IOChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  ioChaos:
+    action: latency
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    volumePath: /
+    path: "/*"
+    delay: "60ms"
+    percent: 100
+    methods: ["READ", "WRITE"]
+    duration: "30m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-network-delay
+  namespace: backend
+spec:
+  schedule: "20 */4 * * *"
+  type: NetworkChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  networkChaos:
+    action: delay
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    delay:
+      latency: "150ms"
+      correlation: "35"
+      jitter: "50ms"
+    duration: "35m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-network-loss
+  namespace: backend
+spec:
+  schedule: "10 */4 * * *"
+  type: NetworkChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  networkChaos:
+    action: loss
+    mode: fixed-percent
+    value: "60"
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    loss:
+      loss: "10"
+      correlation: "25"
+    duration: "30m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-network-duplicate
+  namespace: backend
+spec:
+  schedule: "40 */6 * * *"
+  type: NetworkChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  networkChaos:
+    action: duplicate
+    mode: fixed-percent
+    value: "50"
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    duplicate:
+      duplicate: "6"
+      correlation: "20"
+    duration: "25m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-network-corrupt
+  namespace: backend
+spec:
+  schedule: "50 */6 * * *"
+  type: NetworkChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  networkChaos:
+    action: corrupt
+    mode: fixed-percent
+    value: "50"
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    corrupt:
+      corrupt: "3"
+      correlation: "20"
+    duration: "20m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-bandwidth-limit
+  namespace: backend
+spec:
+  schedule: "30 */8 * * *"
+  type: NetworkChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  networkChaos:
+    action: bandwidth
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    bandwidth:
+      rate: "3mbps"
+      limit: 20971520
+      buffer: 10000
+    duration: "40m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-partition
+  namespace: backend
+spec:
+  schedule: "0 */12 * * *"
+  type: NetworkChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  networkChaos:
+    action: partition
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    direction: both
+    target:
+      mode: all
+      selector:
+        namespaces:
+          - backend
+        labelSelectors:
+          role: dependency
+    duration: "20m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: chaos-24h-dns-fault
+  namespace: backend
+spec:
+  schedule: "15 */6 * * *"
+  type: DNSChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  dnsChaos:
+    action: error
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        chaos-target: "true"
+    patterns:
+      - "*.svc.cluster.local"
+    duration: "20m"

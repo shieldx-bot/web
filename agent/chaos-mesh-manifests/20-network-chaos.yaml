@@ -1,0 +1,117 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-delay-p95
+  namespace: backend
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  delay:
+    latency: "180ms"
+    correlation: "35"
+    jitter: "60ms"
+  duration: "30m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-loss-burst
+  namespace: backend
+spec:
+  action: loss
+  mode: fixed-percent
+  value: "70"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  loss:
+    loss: "12"
+    correlation: "30"
+  duration: "25m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-duplicate
+  namespace: backend
+spec:
+  action: duplicate
+  mode: fixed-percent
+  value: "60"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  duplicate:
+    duplicate: "8"
+    correlation: "20"
+  duration: "20m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-corrupt
+  namespace: backend
+spec:
+  action: corrupt
+  mode: fixed-percent
+  value: "60"
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  corrupt:
+    corrupt: "3"
+    correlation: "25"
+  duration: "20m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-bandwidth-limit
+  namespace: backend
+spec:
+  action: bandwidth
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  bandwidth:
+    rate: "2mbps"
+    limit: 20971520
+    buffer: 10000
+  duration: "35m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-partition-hard
+  namespace: backend
+spec:
+  action: partition
+  mode: all
+  selector:
+    namespaces:
+      - backend
+    labelSelectors:
+      chaos-target: "true"
+  direction: both
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - backend
+      labelSelectors:
+        role: dependency
+  duration: "25m"
