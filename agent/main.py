@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -103,6 +104,21 @@ def parse_time(value: Optional[str], default_dt: datetime) -> datetime:
 	if not value:
 		return default_dt
 	value = value.strip()
+	if value == "now":
+		return datetime.now().astimezone().astimezone(timezone.utc)
+	# Relative format: now-45m, now-2h, now-1d
+	match = re.fullmatch(r"now-(\d+)([mhd])", value)
+	if match:
+		amount = int(match.group(1))
+		unit = match.group(2)
+		now_local = datetime.now().astimezone()
+		if unit == "m":
+			dt = now_local - timedelta(minutes=amount)
+		elif unit == "h":
+			dt = now_local - timedelta(hours=amount)
+		else:
+			dt = now_local - timedelta(days=amount)
+		return dt.astimezone(timezone.utc)
 	if value.isdigit():
 		return datetime.fromtimestamp(int(value), tz=timezone.utc)
 	dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
