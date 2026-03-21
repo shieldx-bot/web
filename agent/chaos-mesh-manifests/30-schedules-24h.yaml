@@ -16,8 +16,8 @@ spec:
         - backend
       labelSelectors:
         chaos-target: "true"
-    volumePath: /
-    path: "/*"
+    volumePath: /mnt/chaos
+    path: "/mnt/chaos/*"
     delay: "60ms"
     percent: 100
     methods: ["READ", "WRITE"]
