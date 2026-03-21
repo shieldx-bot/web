@@ -11,7 +11,13 @@ spec:
     labelSelectors:
       chaos-target: "true"
   stressors:
-    stressngStressors: "--hdd 2 --hdd-bytes 70% --io 4 --timeout 30m"
+    # Compatible with older Chaos Mesh versions that do not support stressngStressors.
+    cpu:
+      workers: 2
+      load: 80
+    memory:
+      workers: 1
+      size: "1GB"
   duration: "30m"
 ---
 apiVersion: batch/v1
