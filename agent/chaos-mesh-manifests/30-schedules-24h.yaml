@@ -190,5 +190,6 @@ spec:
       labelSelectors:
         chaos-target: "true"
     patterns:
-      - "*.svc.cluster.local"
+      - "kubernetes.default.svc.cluster.local"
+      - "myapp.backend.svc.cluster.local"
     duration: "15m"

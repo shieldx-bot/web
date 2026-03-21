@@ -9,7 +9,7 @@ Muc tieu:
 
 ## 1) Dieu kien tien quyet
 
-- Da co Kubernetes cluster va `kubectl` truy cap duoc.
+- Da co Kubernetes cluster va truy cap duoc bang `kubectl` hoac `sudo k3s kubectl`.
 - Da cai Chaos Mesh (`chaos-mesh` namespace).
 - Da co monitoring (`monitoring` namespace), co Prometheus.
 - Trong namespace `backend` co pod target label `chaos-target=true`.
@@ -17,9 +17,10 @@ Muc tieu:
 Kiem tra nhanh:
 
 ```bash
-kubectl get ns | grep -E "chaos-mesh|monitoring|backend" || true
-kubectl get pods -n chaos-mesh
-kubectl get pods -n monitoring
+kctl(){ if command -v k3s >/dev/null 2>&1 && [[ -r /etc/rancher/k3s/k3s.yaml ]]; then sudo k3s kubectl "$@"; else kubectl "$@"; fi; }
+kctl get ns | grep -E "chaos-mesh|monitoring|backend" || true
+kctl get pods -n chaos-mesh
+kctl get pods -n monitoring
 ```
 
 ## 2) Nguyen tac chay quan trong
@@ -31,13 +32,13 @@ kubectl get pods -n monitoring
 ## 3) Khoi tao backend + target pod
 
 ```bash
-kubectl get ns backend >/dev/null 2>&1 || kubectl create ns backend
-kubectl label ns backend chaos-injection=enabled --overwrite
+kctl get ns backend >/dev/null 2>&1 || kctl create ns backend
+kctl label ns backend chaos-injection=enabled --overwrite
 
-kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/00-common-labels.yaml
-kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/01-chaos-target-nginx.yaml
-kubectl rollout status deploy/chaos-target-nginx -n backend --timeout=120s
-kubectl get pods -n backend -l chaos-target=true
+kctl apply -f ./chaos-mesh-manifests/00-common-labels.yaml
+kctl apply -f ./chaos-mesh-manifests/01-chaos-target-nginx.yaml
+kctl rollout status deploy/chaos-target-nginx -n backend --timeout=120s
+kctl get pods -n backend -l chaos-target=true
 ```
 
 ## 4) Chay 24h schedule mode (khuyen nghi)
@@ -45,9 +46,9 @@ kubectl get pods -n backend -l chaos-target=true
 Day la mode on dinh nhat de thu du lieu dai han:
 
 ```bash
-kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/30-schedules-24h.yaml
-kubectl get schedules -n backend
-kubectl get iochaos,networkchaos,dnschaos,stresschaos -n backend
+kctl apply -f ./chaos-mesh-manifests/30-schedules-24h.yaml
+kctl get schedules -n backend
+kctl get iochaos,networkchaos,dnschaos,stresschaos -n backend
 ```
 
 ## 5) Chay immediate mode de test nhanh
@@ -55,8 +56,8 @@ kubectl get iochaos,networkchaos,dnschaos,stresschaos -n backend
 ### 5.1 Disk test
 
 ```bash
-kubectl apply -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/10-disk-iochaos.yaml
-kubectl describe iochaos disk-latency-read-write -n backend | egrep "Type:|Status:|Failed|Applied"
+kctl apply -f ./chaos-mesh-manifests/10-disk-iochaos.yaml
+kctl describe iochaos disk-latency-read-write -n backend | egrep "Type:|Status:|Failed|Applied"
 ```
 
 Ky vong: `Selected=True`, `AllInjected=True`, khong co `path is the root`.
@@ -66,11 +67,11 @@ Ky vong: `Selected=True`, `AllInjected=True`, khong co `path is the root`.
 Khuyen nghi dung script serial:
 
 ```bash
-chmod +x /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/22-network-chaos-serial.sh
-/home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/22-network-chaos-serial.sh
+chmod +x ./chaos-mesh-manifests/22-network-chaos-serial.sh
+./chaos-mesh-manifests/22-network-chaos-serial.sh
 ```
 
-Script nay chay tung fault mot, tranh xung dot netem tree.
+Script nay tu dong uu tien `sudo k3s kubectl` neu phat hien moi truong k3s, va chay tung fault mot de tranh xung dot netem tree.
 
 ## 6) Xu ly loi thuong gap
 
@@ -81,12 +82,12 @@ Nguyen nhan pho bien: network faults chong len nhau hoac resource bi ket finaliz
 Xu ly nhanh:
 
 ```bash
-kubectl delete networkchaos --all -n backend --ignore-not-found
-for r in $(kubectl get networkchaos -n backend -o name); do
-  kubectl patch -n backend "$r" --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' || true
+kctl delete networkchaos --all -n backend --ignore-not-found
+for r in $(kctl get networkchaos -n backend -o name); do
+  kctl patch -n backend "$r" --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' || true
 done
-kubectl rollout restart ds/chaos-daemon -n chaos-mesh
-kubectl rollout status ds/chaos-daemon -n chaos-mesh --timeout=120s
+kctl rollout restart ds/chaos-daemon -n chaos-mesh
+kctl rollout status ds/chaos-daemon -n chaos-mesh --timeout=120s
 ```
 
 ### 6.2 `path is the root`
@@ -102,7 +103,7 @@ File hien tai da dung path an toan:
 Kiem tra target:
 
 ```bash
-kubectl get pods -n backend -l chaos-target=true
+kctl get pods -n backend -l chaos-target=true
 ```
 
 Neu khong co pod nao, apply lai `01-chaos-target-nginx.yaml`.
@@ -113,14 +114,16 @@ Neu khong co pod nao, apply lai `01-chaos-target-nginx.yaml`.
 source /home/shieldx/Documents/Github/lab-mechine-learning/env/bin/activate
 pip install requests pyyaml pandas
 
-python /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/main.py \
+python ./main.py \
   --prom-url http://localhost:9090 \
-  --start 2026-03-21T11:00:00 \
-  --end 2026-03-22T11:00:00 \
+  --start 2026-03-21T15:40:00 \
+  --end 2026-03-21T16:10:00 \
   --step 30s \
-  --rules /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-labeling-rules.yaml \
-  --output /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos_labeled_30s.csv
+  --rules ./chaos-labeling-rules.yaml \
+  --output ./chaos_labeled_30s.csv
 ```
+
+Luu y: Neu `--start/--end` khong co timezone (khong co `Z` hoac `+07:00`) thi script se hieu theo gio local cua server.
 
 Output se gom cot metric + cot label:
 - `label_root_cause`
@@ -132,11 +135,11 @@ Output se gom cot metric + cot label:
 ## 8) Cleanup an toan
 
 ```bash
-kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/30-schedules-24h.yaml --ignore-not-found
-kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/21-dns-chaos.yaml --ignore-not-found
-kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/20-network-chaos.yaml --ignore-not-found
-kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/11-disk-stress-and-fill.yaml --ignore-not-found
-kubectl delete -f /home/shieldx/Documents/Github/lab-mechine-learning/LAB_CENTER/agent/chaos-mesh-manifests/10-disk-iochaos.yaml --ignore-not-found
+kctl delete -f ./chaos-mesh-manifests/30-schedules-24h.yaml --ignore-not-found
+kctl delete -f ./chaos-mesh-manifests/21-dns-chaos.yaml --ignore-not-found
+kctl delete -f ./chaos-mesh-manifests/20-network-chaos.yaml --ignore-not-found
+kctl delete -f ./chaos-mesh-manifests/11-disk-stress-and-fill.yaml --ignore-not-found
+kctl delete -f ./chaos-mesh-manifests/10-disk-iochaos.yaml --ignore-not-found
 ```
 
 Neu can xoa manh network chaos dang ket finalizer, dung them block o muc `6.1`.

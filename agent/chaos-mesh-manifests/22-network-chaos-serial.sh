@@ -4,23 +4,35 @@ set -euo pipefail
 NS="backend"
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+if [[ -r /etc/rancher/k3s/k3s.yaml ]] && command -v k3s >/dev/null 2>&1; then
+  KCTL=(sudo k3s kubectl)
+else
+  KCTL=(kubectl)
+fi
+
+echo "[INFO] using kubectl command: ${KCTL[*]}"
+
+kctl() {
+  "${KCTL[@]}" "$@"
+}
+
 apply_one() {
   local name="$1"
   local yaml="$2"
   local wait_sec="$3"
 
   echo "[INFO] apply ${name}"
-  kubectl apply -f "${yaml}"
+  kctl apply -f "${yaml}"
   sleep "${wait_sec}"
-  kubectl get networkchaos -n "${NS}" || true
+  kctl get networkchaos -n "${NS}" || true
 
   echo "[INFO] delete ${name}"
-  kubectl delete -f "${yaml}" --ignore-not-found
+  kctl delete -f "${yaml}" --ignore-not-found
   sleep 5
 }
 
 has_dependency_targets() {
-  kubectl get pods -n "${NS}" -l role=dependency --no-headers 2>/dev/null | grep -q .
+  kctl get pods -n "${NS}" -l role=dependency --no-headers 2>/dev/null | grep -q .
 }
 
 # These network faults must run one-by-one to avoid tc netem tree conflicts.

@@ -1,3 +1,6 @@
+# WARNING: Do not apply this file as a whole on k3s.
+# It contains multiple NetworkChaos resources that can overlap and trigger tc/netem conflicts.
+# Use 22-network-chaos-serial.sh (or the split 20-network-chaos-*.yaml files one-by-one) instead.
 apiVersion: chaos-mesh.org/v1alpha1
 kind: NetworkChaos
 metadata:

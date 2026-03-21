@@ -107,8 +107,31 @@ def parse_time(value: Optional[str], default_dt: datetime) -> datetime:
 		return datetime.fromtimestamp(int(value), tz=timezone.utc)
 	dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
 	if dt.tzinfo is None:
-		dt = dt.replace(tzinfo=timezone.utc)
+		# If user provides no timezone, interpret it as local server time.
+		# This is more intuitive for operational commands typed on the server.
+		local_tz = datetime.now().astimezone().tzinfo or timezone.utc
+		dt = dt.replace(tzinfo=local_tz)
 	return dt.astimezone(timezone.utc)
+
+
+def resolve_existing_path(path_str: str) -> Path:
+	"""Resolve path with a practical fallback to current working directory.
+
+	Examples:
+	- LAB_CENTER/agent/chaos-labeling-rules.yaml (repo root)
+	- ./chaos-labeling-rules.yaml (agent dir)
+	"""
+	p = Path(path_str)
+	if p.exists():
+		return p
+
+	# Fallback: if only basename exists in cwd, use it.
+	alt = Path(p.name)
+	if alt.exists():
+		print(f"[WARN] Path not found: {p}. Using {alt} instead.")
+		return alt
+
+	return p
 
 
 def prometheus_query_range(
@@ -417,7 +440,7 @@ def main() -> None:
 	if end <= start:
 		raise ValueError("End time must be greater than start time")
 
-	rules_path = Path(args.rules)
+	rules_path = resolve_existing_path(args.rules)
 	with rules_path.open("r", encoding="utf-8") as f:
 		rules_cfg = yaml.safe_load(f)
 
@@ -467,7 +490,9 @@ def main() -> None:
 	other_cols = [c for c in labeled_df.columns if c not in front_cols]
 	final_df = labeled_df[front_cols + other_cols]
 
-	output_path = Path(args.output)
+	output_path = resolve_existing_path(args.output)
+	if output_path.exists() and output_path.is_dir():
+		raise IsADirectoryError(f"Output path points to a directory: {output_path}")
 	output_path.parent.mkdir(parents=True, exist_ok=True)
 	final_df.to_csv(output_path, index=False)
 	print(f"[INFO] Wrote labeled dataset: {output_path}")

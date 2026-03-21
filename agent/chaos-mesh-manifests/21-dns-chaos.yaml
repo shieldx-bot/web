@@ -12,7 +12,9 @@ spec:
     labelSelectors:
       chaos-target: "true"
   patterns:
-    - "*.svc.cluster.local"
+    # Avoid wildcard patterns for better compatibility across Chaos Mesh/k3s versions.
+    - "kubernetes.default.svc.cluster.local"
+    - "myapp.backend.svc.cluster.local"
   duration: "20m"
 ---
 apiVersion: chaos-mesh.org/v1alpha1
@@ -31,5 +33,5 @@ spec:
       chaos-target: "true"
   patterns:
     - "kubernetes.default.svc.cluster.local"
-    - "*.backend.svc.cluster.local"
+    - "myapp.backend.svc.cluster.local"
   duration: "20m"
