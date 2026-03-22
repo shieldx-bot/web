@@ -28,6 +28,7 @@ global:
 labels:
   root_cause:
     - normal
+      - insufficient_data
     - disk_latency
     - disk_saturation
     - disk_error
@@ -57,11 +58,11 @@ rules:
         value: 1
       - metric: request_fault
         op: z_gt
-        value: 3
+        value: 2
         window: w60
       - metric: timeout_total
         op: z_gt
-        value: 3
+        value: 2
         window: w60
 
   - id: R_DNS_HARD
@@ -74,11 +75,11 @@ rules:
       - all_of:
           - metric: dns_failure_rate
             op: z_gt
-            value: 3
+            value: 2
             window: w60
           - metric: dns_lookup_time_ms
             op: z_gt
-            value: 2
+            value: 1.5
             window: w60
 
   - id: R_DISK_ERROR_HARD
@@ -164,11 +165,11 @@ rules:
     all_of:
       - metric: net_latency_p95_ms
         op: z_gt
-        value: 2
+        value: 1
         window: w60
       - metric: net_latency_p90_ms
         op: z_gt
-        value: 2
+        value: 1
         window: w60
       - metric: net_throughput
         op: delta_gt
@@ -182,20 +183,42 @@ rules:
       - any_of:
           - metric: packet_loss_percent
             op: z_gt
-            value: 2
+            value: 1.5
             window: w60
           - metric: drop_rate
             op: z_gt
-            value: 2
+            value: 1.5
             window: w60
       - metric: retry_rate
         op: z_gt
-        value: 2
+        value: 1
         window: w60
       - metric: net_latency_ms
         op: z_gt
         value: 1
         window: w60
+
+  - id: R_SERVICE_UNSTABLE
+    label: unknown_anomaly
+    hard_fault: false
+    all_of:
+      - any_of:
+          - metric: request_fault
+            op: z_gt
+            value: 1
+            window: w60
+          - metric: retry_rate
+            op: z_gt
+            value: 1
+            window: w60
+      - any_of:
+          - metric: timeout_total
+            op: z_gt
+            value: 1
+            window: w60
+          - metric: request_fault
+            op: gt
+            value: 0
 
   - id: R_NET_DUPLICATE
     label: net_duplicate

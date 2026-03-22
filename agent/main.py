@@ -68,6 +68,14 @@ DEFAULT_METRIC_QUERIES: Dict[str, str] = {
 }
 
 
+CRITICAL_METRICS_FOR_LABELING = [
+	"dns_probe_success",
+	"dns_failure_rate",
+	"net_latency_p95_ms",
+	"zero_traffic",
+]
+
+
 @dataclass
 class RuleHit:
 	rule_id: str
@@ -340,6 +348,14 @@ def evaluate_condition_tree(row: pd.Series, node: Dict[str, Any], default_window
 	return evaluate_atomic(row, node, default_window)
 
 
+def has_missing_critical_metrics(row: pd.Series, metric_names: Iterable[str]) -> bool:
+	for metric in metric_names:
+		val = row.get(metric)
+		if pd.isna(val):
+			return True
+	return False
+
+
 def apply_rules(df: pd.DataFrame, rules_cfg: Dict[str, Any]) -> pd.DataFrame:
 	out = df.copy()
 	labels: List[str] = []
@@ -361,8 +377,12 @@ def apply_rules(df: pd.DataFrame, rules_cfg: Dict[str, Any]) -> pd.DataFrame:
 		hard_hit = any(h.hard_fault for h in hits)
 
 		if not labels_hit:
-			label = "normal"
-			confidence = 0.4
+			if has_missing_critical_metrics(row, CRITICAL_METRICS_FOR_LABELING):
+				label = "insufficient_data"
+				confidence = 0.2
+			else:
+				label = "normal"
+				confidence = 0.4
 			is_mixed = 0
 		elif len(labels_hit) >= 2:
 			label = "mixed_fault"
@@ -390,7 +410,7 @@ def apply_rules(df: pd.DataFrame, rules_cfg: Dict[str, Any]) -> pd.DataFrame:
 
 
 def infer_severity(row: pd.Series, label: str) -> str:
-	if label == "normal":
+	if label in {"normal", "insufficient_data"}:
 		return "low"
 
 	# Simple practical severity scoring from available metrics.
